@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Scraper</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        input, button { margin: 5px; padding: 8px; }
+        #results { margin-top: 20px; }
+        .item { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+    <h2>Custom Web Scraper</h2>
+    
+    <label>Allowed Domains:</label>
+    <input type="text" id="allowedDomains" placeholder="e.g., webscraper.io">
+
+    <label>CSS Selector:</label>
+    <input type="text" id="cssSelector" placeholder="e.g., div.product-wrapper">
+
+    <label>Target URL:</label>
+    <input type="text" id="targetURL" placeholder="e.g., https://webscraper.io/test-sites/e-commerce/allinone">
+
+    <button onclick="startScraping()">Scrape</button>
+
+    <h3>Scraped Results:</h3>
+    <div id="results"></div>
+
+    <script>
+        async function startScraping() {
+            const allowedDomains = document.getElementById("allowedDomains").value.split(",");
+            const cssSelector = document.getElementById("cssSelector").value;
+            const targetURL = document.getElementById("targetURL").value;
+
+            const response = await fetch("/scrape", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ allowed_domains: allowedDomains, css_selector: cssSelector, target_url: targetURL })
+            });
+
+            const data = await response.json();
+            displayResults(data);
+        }
+
+        function displayResults(data) {
+            const resultsDiv = document.getElementById("results");
+            resultsDiv.innerHTML = ""; // Clear previous results
+
+            data.forEach(item => {
+                resultsDiv.innerHTML += `
+                    <div class="item">
+                        <p><strong>Text:</strong> ${item.text}</p>
+                        ${item.img ? `<img src="${item.img}" width="100">` : ""}
+                        ${item.price ? `<p><strong>Price:</strong> ${item.price}</p>` : ""}
+                    </div>
+                `;
+            });
+        }
+    </script>
+
+</body>
+</html>
