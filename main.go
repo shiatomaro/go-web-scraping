@@ -8,55 +8,58 @@ import (
 	"github.com/gocolly/colly"
 )
 
+// Struct for user input
 type ScrapeRequest struct {
-	AllowedDomains []string `json:"allowed_domains"`
-	CSSSelector    string   `json:"css_selector"`
-	TargetURL      string   `json:"target_url"`
+	AllowedDomains []string          `json:"allowed_domains"`
+	TargetURL      string            `json:"target_url"`
+	Selectors      map[string]string `json:"selectors"` // Key: field name, Value: CSS selector
 }
 
-type ScrapedData struct {
-	Text  string `json:"text"`
-	Img   string `json:"img,omitempty"`
-	Price string `json:"price,omitempty"`
-}
+// Struct to hold scraped data
+type ScrapedData map[string]string // Dynamic key-value storage
 
-func scrapedWebsite(w http.ResponseWriter, r *http.Request) {
+var results []ScrapedData // Store scraped data
+
+// Scrape function
+func scrapeWebsite(w http.ResponseWriter, r *http.Request) {
 	var request ScrapeRequest
-
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
 		http.Error(w, "Invalid request format", http.StatusBadRequest)
+		return
 	}
 
 	c := colly.NewCollector(
 		colly.AllowedDomains(request.AllowedDomains...),
 	)
 
-	var results []ScrapedData
+	results = nil // Clear old results
 
-	c.OnHTML(request.CSSSelector, func(h *colly.HTMLElement) {
-		results = append(results, ScrapedData{
-			Text:  h.Text,
-			Img:   h.ChildAttr("img", "src"),
-			Price: h.ChildText(".price"),
-		})
+	// Scrape using dynamic selectors
+	c.OnHTML("body", func(h *colly.HTMLElement) {
+		data := make(ScrapedData)
+		for field, selector := range request.Selectors {
+			data[field] = h.ChildText(selector) // Extract text by default
+		}
+		results = append(results, data)
 	})
 
+	// Visit user-provided URL
 	err = c.Visit(request.TargetURL)
 	if err != nil {
-		http.Error(w, "Failed to scrape site", http.StatusInternalServerError)
+		http.Error(w, "Failed to scrape the site", http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "applicatiob/json")
+	// Send JSON response
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(results)
 }
 
 func main() {
-	http.HandleFunc("/scrape", scrapedWebsite)
+	http.HandleFunc("/scrape", scrapeWebsite)
+	http.Handle("/", http.FileServer(http.Dir("./static"))) // Serve frontend
 
-	http.Handle("/", http.FileServer(http.Dir("./static")))
-
-	fmt.Println("Server running on http://localhost:8080, press ctrl+c to exist")
+	fmt.Println("Server running on http://localhost:8080")
 	http.ListenAndServe(":8080", nil)
 }

@@ -3,61 +3,173 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Web Scraper</title>
+    <title>Web Scraper UI</title>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        input, button { margin: 5px; padding: 8px; }
-        #results { margin-top: 20px; }
-        .item { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: #f4f4f4;
+        }
+        .container {
+            width: 60%;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+        }
+        input {
+            width: 70%;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            font-size: 16px;
+        }
+        button {
+            background: #28a745;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
+            border: none;
+            padding: 6px 12px; 
+            font-size: 14px;  
+            margin-top: 10px;
+            border-radius: 4px;
+        }
+        .selectors {
+            margin-top: 10px;
+        }
+        .selector-input {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .selector-input input {
+            flex: 1;
+            font-size: 18px;
+            padding: 12px;
+        }
+        .remove-btn {
+            background: #dc3545;
+            padding: 6px 10px;
+            font-size: 14px;
+        }
+        #results {
+            margin-top: 20px;
+            background: #eee;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            max-height: 300px;
+            font-size: 16px;
+        }
+        .export-btns {
+            display: flex;
+            gap: 5px;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
 
-    <h2>Custom Web Scraper</h2>
-    
-    <label>Allowed Domains:</label>
-    <input type="text" id="allowedDomains" placeholder="e.g., webscraper.io">
+    <div class="container">
+        <h2>Shallow Scraping</h2>
 
-    <label>CSS Selector:</label>
-    <input type="text" id="cssSelector" placeholder="e.g., div.product-wrapper">
+        <label>Allowed Domains</label>
+        <input type="text" id="allowedDomains" placeholder="example.com, another.com">
 
-    <label>Target URL:</label>
-    <input type="text" id="targetURL" placeholder="e.g., https://webscraper.io/test-sites/e-commerce/allinone">
+        <label>Target URL</label>
+        <input type="text" id="targetURL" placeholder="https://example.com">
 
-    <button onclick="startScraping()">Scrape</button>
+        <div class="selectors">
+            <h4>CSS Selectors</h4>
+            <div id="selectorsList">
+                <div class="selector-input">
+                    <input type="text" class="field-name" placeholder="Field Name (e.g. price)">
+                    <input type="text" class="field-selector" placeholder="CSS Selector (e.g. .price)">
+                    <button class="remove-btn" onclick="removeSelector(this)">X</button>
+                </div>
+            </div>
+            <button onclick="addSelector()">+ Add More Selectors</button>
+        </div>
 
-    <h3>Scraped Results:</h3>
-    <div id="results"></div>
+        <button onclick="startScraping()">Start Scraping</button>
+
+        <h3>Results:</h3>
+        <pre id="results">No data yet.</pre>
+
+        <div class="export-btns">
+            <button onclick="exportJSON()">Export JSON</button>
+            <button onclick="exportCSV()">Export CSV</button>
+        </div>
+    </div>
 
     <script>
-        async function startScraping() {
-            const allowedDomains = document.getElementById("allowedDomains").value.split(",");
-            const cssSelector = document.getElementById("cssSelector").value;
-            const targetURL = document.getElementById("targetURL").value;
+        function addSelector() {
+            let div = document.createElement("div");
+            div.className = "selector-input";
+            div.innerHTML = `
+                <input type="text" class="field-name" placeholder="Field Name (e.g. price)">
+                <input type="text" class="field-selector" placeholder="CSS Selector (e.g. .price)">
+                <button class="remove-btn" onclick="removeSelector(this)">X</button>
+            `;
+            document.getElementById("selectorsList").appendChild(div);
+        }
 
-            const response = await fetch("/scrape", {
+        function removeSelector(button) {
+            button.parentElement.remove();
+        }
+
+        async function startScraping() {
+            let allowedDomains = document.getElementById("allowedDomains").value.split(",");
+            let targetURL = document.getElementById("targetURL").value;
+
+            let selectors = {};
+            document.querySelectorAll(".selector-input").forEach(div => {
+                let field = div.querySelector(".field-name").value;
+                let selector = div.querySelector(".field-selector").value;
+                if (field && selector) {
+                    selectors[field] = selector;
+                }
+            });
+
+            const response = await fetch("http://localhost:8080/scrape", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ allowed_domains: allowedDomains, css_selector: cssSelector, target_url: targetURL })
+                body: JSON.stringify({ allowed_domains: allowedDomains, target_url: targetURL, selectors })
             });
 
             const data = await response.json();
-            displayResults(data);
+            document.getElementById("results").textContent = JSON.stringify(data, null, 2);
         }
 
-        function displayResults(data) {
-            const resultsDiv = document.getElementById("results");
-            resultsDiv.innerHTML = ""; // Clear previous results
+        function exportJSON() {
+            let data = document.getElementById("results").textContent;
+            let blob = new Blob([data], { type: "application/json" });
+            let a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = "scraped-data.json";
+            a.click();
+        }
 
-            data.forEach(item => {
-                resultsDiv.innerHTML += `
-                    <div class="item">
-                        <p><strong>Text:</strong> ${item.text}</p>
-                        ${item.img ? `<img src="${item.img}" width="100">` : ""}
-                        ${item.price ? `<p><strong>Price:</strong> ${item.price}</p>` : ""}
-                    </div>
-                `;
+        function exportCSV() {
+            let data = JSON.parse(document.getElementById("results").textContent);
+            if (!Array.isArray(data)) {
+                alert("No data to export!");
+                return;
+            }
+
+            let csv = Object.keys(data[0]).join(",") + "\n";
+            data.forEach(row => {
+                csv += Object.values(row).map(value => `"${value}"`).join(",") + "\n";
             });
+
+            let blob = new Blob([csv], { type: "text/csv" });
+            let a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = "scraped-data.csv";
+            a.click();
         }
     </script>
 
